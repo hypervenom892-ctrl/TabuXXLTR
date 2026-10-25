@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Tabu XL Türkiye - Kıvrımlı Tahta Oyunu</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      background: radial-gradient(circle at center, #1e1b4b, #0f172a, #020617);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    /* Tabu XL Card Visuals */
+    .card-shadow {
+      box-shadow: 0 20px 40px -15px rgba(236, 72, 153, 0.35), 0 0 35px 0 rgba(168, 85, 247, 0.25);
+    }
+    .pulse-glow {
+      animation: pulseGlow 2s infinite alternate;
+    }
+    @keyframes pulseGlow {
+      0% { box-shadow: 0 0 15px rgba(236, 72, 153, 0.4); }
+      100% { box-shadow: 0 0 30px rgba(168, 85, 247, 0.8); }
+    }
+    /* Spiral SVG Board SVG styling */
+    .board-tile-path {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .board-tile-path:hover {
+      filter: brightness(1.2);
+    }
+    .pawn-anim {
+      transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <!-- TOP HEADER BAR -->
+  <header class="bg-slate-900/90 backdrop-blur border-b border-purple-900/50 px-4 py-3 flex items-center justify-between z-20">
+    <div class="flex items-center gap-3">
+      <div class="p-2.5 bg-gradient-to-tr from-fuchsia-600 via-purple-600 to-amber-500 rounded-2xl shadow-lg shadow-purple-900/50">
+        <i data-lucide="party-popper" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="font-black text-xl tracking-wider bg-gradient-to-r from-amber-400 via-fuchsia-400 to-cyan-400 bg-clip-text text-transparent">TABU XL TÜRKİYE</h1>
+        <p class="text-[10px] font-bold tracking-widest text-amber-300/80 uppercase">Orijinal Kıvrımlı Tahta Sürümü</p>
+      </div>
+    </div>
+
+    <!-- Active Turn Header Status -->
+    <div id="turn-banner" class="hidden md:flex items-center gap-4 bg-slate-950/80 px-4 py-1.5 rounded-full border border-purple-500/30 shadow-inner">
+      <span class="text-xs font-bold text-slate-400">SIRA:</span>
+      <div class="flex items-center gap-2">
+        <span id="turn-team-badge" class="w-4 h-4 rounded-full bg-red-500 ring-2 ring-white animate-pulse"></span>
+        <span id="turn-team-name" class="font-extrabold text-sm text-red-400">Kırmızı Takım</span>
+      </div>
+      <div class="h-4 w-px bg-slate-800"></div>
+      <div class="text-amber-400 font-black text-sm" id="turn-team-tile">Kare: 0</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex items-center gap-2">
+      <button onclick="toggleAudio()" id="audio-btn" class="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition">
+        <i data-lucide="volume-2" id="audio-icon" class="w-5 h-5 text-emerald-400"></i>
+      </button>
+      <button onclick="openSettingsModal()" class="p-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl transition">
+        <i data-lucide="settings" class="w-5 h-5 text-slate-300"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN PLAY AREA (CARDS + BOARD SIDE BY SIDE) -->
+  <main class="flex-1 flex flex-col xl:flex-row items-stretch justify-center p-3 xl:p-6 gap-6 max-w-[1600px] mx-auto w-full">
+
+    <!-- LEFT / CENTER: TABOO CARD ENGINE -->
+    <section class="flex-1 flex flex-col items-center justify-between gap-4 order-1">
+      
+      <!-- GAME SCORE & TEAM BAR -->
+      <div class="w-full bg-slate-900/80 border border-purple-900/50 rounded-3xl p-4 flex flex-wrap items-center justify-between gap-3 backdrop-blur shadow-xl">
+        <!-- Team Scores Container -->
+        <div id="teams-scoreboard-box" class="flex items-center gap-3 overflow-x-auto py-1 max-w-full">
+          <!-- Dynamic Team Badges Inserted Here -->
+        </div>
+
+        <!-- Timer Display Block -->
+        <div class="flex flex-col items-center mx-auto sm:mx-0">
+          <div id="timer-box" class="w-20 h-20 bg-slate-950 border-4 border-cyan-500 rounded-2xl flex flex-col items-center justify-center shadow-lg shadow-cyan-500/20 relative">
+            <span id="timer-display" class="text-3xl font-black text-cyan-400">60</span>
+            <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider">saniye</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BONUS TILE NOTIFICATION BANNER -->
+      <div id="tile-bonus-banner" class="w-full max-w-md bg-gradient-to-r from-emerald-600/90 to-teal-700/90 border border-emerald-400 rounded-2xl p-3 text-center shadow-lg hidden animate-bounce">
+        <div class="flex items-center justify-center gap-2 font-black text-sm text-white">
+          <i id="bonus-banner-icon" data-lucide="clock" class="w-5 h-5"></i>
+          <span id="bonus-banner-text">+15 SANİYE EKSTRA SÜRE AKTİF!</span>
+        </div>
+      </div>
+
+      <!-- TABOO CARD ITEM -->
+      <div class="w-full max-w-md flex-1 flex flex-col justify-center my-1">
+        
+        <!-- CARD CONTAINER -->
+        <div id="card-container" class="bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950/70 border-2 border-fuchsia-500/50 rounded-3xl p-6 card-shadow flex flex-col justify-between min-h-[400px] relative overflow-hidden transition-all duration-300">
+          
+          <!-- Background Glows -->
+          <div class="absolute -right-12 -top-12 w-36 h-36 bg-fuchsia-500/15 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="absolute -left-12 -bottom-12 w-36 h-36 bg-amber-500/15 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Card Top Bar (Category & Remaining Pass) -->
+          <div class="flex justify-between items-center pb-3 border-b border-purple-800/40 z-10">
+            <span id="card-category" class="text-xs font-extrabold px-3 py-1 bg-purple-900/80 border border-purple-600/60 rounded-full text-purple-200 tracking-wide uppercase">
+              Genel Kültür
+            </span>
+            <span class="text-xs font-extrabold text-slate-300 flex items-center gap-1 bg-slate-950/60 px-2.5 py-1 rounded-full border border-slate-800">
+              <i data-lucide="skip-forward" class="w-3.5 h-3.5 text-amber-400"></i> Kalan Pas: <strong id="pas-count-display" class="text-amber-400 text-sm">3</strong>
+            </span>
+          </div>
+
+          <!-- Target Word (Hedef Kelime) -->
+          <div class="text-center my-4 z-10">
+            <span class="text-[10px] font-black uppercase tracking-widest text-fuchsia-400 mb-1 block">ANLATILACAK KELİME</span>
+            <h2 id="target-word" class="text-3xl sm:text-4xl font-black text-white tracking-wide uppercase bg-gradient-to-r from-white via-slate-100 to-fuchsia-200 bg-clip-text text-transparent">
+              BAKLAVA
+            </h2>
+          </div>
+
+          <!-- Forbidden Words List (Yasaklı Kelimeler) -->
+          <div class="bg-slate-950/80 border border-red-900/50 rounded-2xl p-4 my-2 z-10 shadow-inner">
+            <span class="text-[10px] font-black uppercase tracking-widest text-red-400 text-center block mb-2 flex items-center justify-center gap-1.5">
+              <i data-lucide="ban" class="w-4 h-4"></i> YASAKLI KELİMELER
+            </span>
+            <ul id="forbidden-words-list" class="space-y-2 text-center font-bold text-slate-200 text-sm sm:text-base">
+              <!-- Rendered dynamically -->
+            </ul>
+          </div>
+
+          <!-- Card Footer Status -->
+          <div class="text-center pt-2 z-10">
+            <span class="text-[11px] font-bold text-slate-400" id="card-status-text">Yasaklı kelimeleri kullanmadan takım arkadaşına anlat!</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- MAIN ACTION BUTTONS -->
+      <div class="w-full max-w-md flex flex-col gap-3">
+        <!-- Ready / Start Round Button -->
+        <button id="start-turn-btn" onclick="startTurn()" class="w-full py-4 bg-gradient-to-r from-fuchsia-600 via-purple-600 to-amber-500 hover:from-fuchsia-500 hover:to-amber-400 text-white font-black text-lg uppercase tracking-wider rounded-2xl shadow-xl shadow-purple-900/50 active:scale-95 transition flex items-center justify-center gap-2">
+          <i data-lucide="play" class="w-6 h-6 fill-current"></i> Turu Başlat!
+        </button>
+
+        <!-- Active Gameplay Controls -->
+        <div id="active-controls" class="grid grid-cols-3 gap-3 hidden">
+          <!-- TABU (Penalty) -->
+          <button onclick="handleAction('tabu')" class="py-4 bg-gradient-to-b from-red-600 to-rose-700 hover:from-red-500 hover:to-rose-600 active:scale-95 text-white rounded-2xl shadow-lg shadow-red-900/40 font-black text-sm uppercase tracking-wider flex flex-col items-center justify-center gap-1 transition border border-red-500/30">
+            <i data-lucide="x-circle" class="w-6 h-6"></i> TABU!
+          </button>
+          <!-- PAS (Skip) -->
+          <button id="pas-btn" onclick="handleAction('pas')" class="py-4 bg-gradient-to-b from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 active:scale-95 text-white rounded-2xl shadow-lg shadow-amber-900/40 font-black text-sm uppercase tracking-wider flex flex-col items-center justify-center gap-1 transition border border-amber-500/30">
+            <i data-lucide="skip-forward" class="w-6 h-6"></i> PAS
+          </button>
+          <!-- DOĞRU (Correct) -->
+          <button onclick="handleAction('dogru')" class="py-4 bg-gradient-to-b from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 active:scale-95 text-white rounded-2xl shadow-lg shadow-emerald-900/40 font-black text-sm uppercase tracking-wider flex flex-col items-center justify-center gap-1 transition border border-emerald-500/30">
+            <i data-lucide="check-circle-2" class="w-6 h-6"></i> DOĞRU!
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: TABU XL CURVED SPIRAL BOARD DISPLAY -->
+    <aside class="w-full xl:w-[540px] bg-slate-900/90 border border-purple-900/50 rounded-3xl p-4 sm:p-5 flex flex-col justify-between backdrop-blur shadow-2xl order-2">
+      <!-- Board Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+        <h3 class="font-black text-base text-amber-300 flex items-center gap-2">
+          <i data-lucide="map" class="w-5 h-5 text-amber-400"></i> TABU XL KIVRIMLI TAHTA
+        </h3>
+        <span class="text-xs font-extrabold text-cyan-400 bg-cyan-950/60 px-3 py-1 rounded-full border border-cyan-800">
+          Hedef: <strong id="win-score-display">36</strong>. Kare (YILDIZ)
+        </span>
+      </div>
+
+      <!-- SPIRAL SVG BOARD GRAPHIC -->
+      <div class="relative w-full aspect-square my-2 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden p-2">
+        
+        <!-- SVG Spiral Track Rendered Dynamically -->
+        <svg id="tabu-spiral-svg" class="w-full h-full" viewBox="0 0 600 600">
+          <!-- Spiral Path & Tiles Rendered via JS -->
+        </svg>
+
+        <!-- Center Finish Star Overlay -->
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div class="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 border-4 border-yellow-200 shadow-2xl flex flex-col items-center justify-center text-slate-950 font-black text-center p-1 animate-pulse">
+            <i data-lucide="star" class="w-7 h-7 fill-slate-950"></i>
+            <span class="text-[9px] font-black leading-tight">BİTİŞ</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- BOARD LEGEND & TILE TYPES -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px] font-bold">
+        <div class="bg-slate-950/80 p-2 rounded-xl border border-emerald-500/40 flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-emerald-500 flex items-center justify-center text-[8px] text-black font-black">+</span>
+          <span class="text-emerald-300">+15 Sn Ekstra</span>
+        </div>
+        <div class="bg-slate-950/80 p-2 rounded-xl border border-amber-500/40 flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-amber-500 flex items-center justify-center text-[8px] text-black font-black">2x</span>
+          <span class="text-amber-300">Çift Puan</span>
+        </div>
+        <div class="bg-slate-950/80 p-2 rounded-xl border border-purple-500/40 flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-purple-500 flex items-center justify-center text-[8px] text-white font-black">P</span>
+          <span class="text-purple-300">+1 Pas Hakkı</span>
+        </div>
+        <div class="bg-slate-950/80 p-2 rounded-xl border border-rose-500/40 flex items-center gap-1.5">
+          <span class="w-3 h-3 rounded-full bg-rose-500 flex items-center justify-center text-[8px] text-white font-black">-1</span>
+          <span class="text-rose-300">Kolay Yasak</span>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+
+  <!-- GAME SETTINGS MODAL -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border border-purple-800/50 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative">
+      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+        <h3 class="text-lg font-black text-slate-100 flex items-center gap-2">
+          <i data-lucide="sliders" class="w-5 h-5 text-amber-400"></i> Oyuncu & Oyun Ayarları
+        </h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div class="py-4 space-y-4 text-sm max-h-[70vh] overflow-y-auto custom-scrollbar">
+        <!-- Number of Teams -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1">Takım Sayısı (2 - 4 Takım)</label>
+          <select id="select-teams-count" onchange="renderTeamInputs()" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-amber-500">
+            <option value="2">2 Takım (Kırmızı vs Mavi)</option>
+            <option value="3">3 Takım (Kırmızı vs Mavi vs Yeşil)</option>
+            <option value="4" selected>4 Takım (Kırmızı vs Mavi vs Yeşil vs Sarı)</option>
+          </select>
+        </div>
+
+        <!-- Team Name Inputs -->
+        <div id="team-inputs-container" class="space-y-2">
+          <!-- Generated Dynamically -->
+        </div>
+
+        <!-- Timer Duration -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1">Standart Tur Süresi</label>
+          <select id="select-timer" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white font-semibold focus:outline-none focus:border-purple-500">
+            <option value="45">45 Saniye</option>
+            <option value="60" selected>60 Saniye</option>
+            <option value="90">90 Saniye</option>
+          </select>
+        </div>
+
+        <!-- Tabu Penalty Toggle -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+          <span class="font-bold text-slate-300">Tabu Cezası (-1 Puan düşsün mü?)</span>
+          <input type="checkbox" id="check-tabu-penalty" checked class="w-5 h-5 accent-amber-500 rounded cursor-pointer">
+        </div>
+      </div>
+
+      <div class="pt-4 border-t border-slate-800 flex justify-end gap-3">
+        <button onclick="saveSettings()" class="w-full py-3 bg-gradient-to-r from-amber-500 via-purple-600 to-fuchsia-600 font-extrabold text-white rounded-xl shadow-lg">
+          Ayarları Kaydet & Oyunu Yeniden Başlat
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INTERMISSION TURN MODAL (Pass and Play) -->
+  <div id="turn-modal" class="fixed inset-0 bg-slate-950/95 backdrop-blur-lg z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-gradient-to-b from-slate-900 via-slate-900 to-purple-950 border border-purple-500/40 rounded-3xl max-w-md w-full p-8 shadow-2xl text-center space-y-6">
+      <div id="modal-team-icon-box" class="w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-xl ring-4 ring-white/20">
+        <i data-lucide="users" class="w-10 h-10 text-white"></i>
+      </div>
+
+      <div>
+        <span class="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">SIRA GELEN TAKIM</span>
+        <h2 id="modal-next-team" class="text-3xl font-black text-amber-400 uppercase tracking-wide">Kırmızı Takım</h2>
+        <p class="text-xs text-slate-300 mt-2">Cihazı anlatıcı oyuncuya verin. Hazır olduğunuzda turu başlatın!</p>
+      </div>
+
+      <!-- Current Tile Special Info -->
+      <div id="modal-tile-info" class="bg-slate-950/80 p-3 rounded-2xl border border-slate-800 text-xs font-bold text-amber-300 hidden">
+        <i data-lucide="sparkles" class="w-4 h-4 inline mr-1 text-amber-400"></i>
+        <span id="modal-tile-text">Özel Kare Bonusu: +15 Sn Ekstra Süre!</span>
+      </div>
+
+      <button onclick="closeTurnModal()" class="w-full py-4 bg-gradient-to-r from-amber-500 via-fuchsia-600 to-cyan-500 hover:opacity-90 text-white font-black text-base uppercase tracking-wider rounded-2xl shadow-xl transition">
+        Sıradaki Tur İçin Hazırız!
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       1. TURKISH TABOO CARDS DATABASE
+       ========================================================================== */
+    const TABOO_CARDS = [
+      { target: "BAKLAVA", category: "Yiyecek & Mutfak", forbidden: ["Tatlı", "Fıstık", "Şerbet", "Yufka", "Gaziantep"] },
+      { target: "İSKENDER", category: "Yiyecek & Mutfak", forbidden: ["Döner", "Bursa", "Yoğurt", "Tereyağı", "Pide"] },
+      { target: "KAPADOKYA", category: "Gezi & Kültür", forbidden: ["Peri Bacaları", "Balon", "Nevşehir", "Turist", "Mağara"] },
+      { target: "GALATA KULESİ", category: "Tarih & Mimari", forbidden: ["İstanbul", "Beyoğlu", "Hezarfen", "Manzara", "Tarihi"] },
+      { target: "NAZAR BONCUĞU", category: "Kültür & Gelenek", forbidden: ["Mavi", "Göz", "Nazar", "Kem Göz", "Aksesuar"] },
+      { target: "ÇAY", category: "Günlük Yaşam", forbidden: ["Rize", "Demlik", "İnce Belli", "Tiryaki", "İçecek"] },
+      { target: "TÜRK KAHVESİ", category: "Kültür & Gelenek", forbidden: ["Fincan", "Köpük", "Telve", "Fal", "Lokum"] },
+      { target: "PERİ BACALARI", category: "Gezi & Kültür", forbidden: ["Kapadokya", "Nevşehir", "Rüzgar", "Taş", "Oluşum"] },
+      { target: "SİMİT", category: "Yiyecek & Mutfak", forbidden: ["Susam", "Sokak", "Gevrek", "Çay", "Fırın"] },
+      { target: "MANTI", category: "Yiyecek & Mutfak", forbidden: ["Kayseri", "Yoğurt", "Hamur", "Kıyma", "Sarımsak"] },
+      { target: "KIZ KULESİ", category: "Tarih & Mimari", forbidden: ["Üsküdar", "Deniz", "İstanbul", "Efsane", "Yılan"] },
+      { target: "PAMUKKALE", category: "Gezi & Kültür", forbidden: ["Traverten", "Denizli", "Beyaz", "Su", "Kaplıca"] },
+      { target: "ANITKABİR", category: "Tarih & Anıt", forbidden: ["Atatürk", "Ankara", "Aslanlı Yol", "Anıt", "Kabir"] },
+      { target: "SÜMELA MANASTIRI", category: "Tarih & Kültür", forbidden: ["Trabzon", "Dağ", "Maçka", "Kilise", "Kaya"] },
+      { target: "NARGİLE", category: "Günlük Yaşam", forbidden: ["Duman", "Marpuç", "Köz", "Tütün", "Kafe"] },
+      { target: "TAVLA", category: "Oyun & Eğlence", forbidden: ["Zar", "Pul", "Mars", "Kapı", "Erkek"] },
+      { target: "KEMENÇE", category: "Müzik & Sanat", forbidden: ["Karadeniz", "Horon", "Yay", "Çalgı", "Enstrüman"] },
+      { target: "BAĞLAMA", category: "Müzik & Sanat", forbidden: ["Saz", "Türkü", "Tezene", "Tel", "Ozan"] },
+      { target: "HALAY", category: "Kültür & Dans", forbidden: ["Mendil", "Omuz", "Düğün", "Zurna", "Davul"] },
+      { target: "HORON", category: "Kültür & Dans", forbidden: ["Karadeniz", "Kemençe", "Hızlı", "Omuz", "Rize"] },
+      { target: "SEMAZEN", category: "Kültür & İnanç", forbidden: ["Mevlana", "Konya", "Dönmek", "Sikke", "Tennure"] },
+      { target: "GÖBEKLİTEPE", category: "Tarih & Arkeoloji", forbidden: ["Şanlıurfa", "Tarih", "Tapınak", "Taş", "Eski"] },
+      { target: "LOKUM", category: "Yiyecek & Mutfak", forbidden: ["Tatlı", "Gül", "Fıstık", "Pudra Şekeri", "Kahve"] },
+      { target: "DÖNER", category: "Yiyecek & Mutfak", forbidden: ["Et", "Tavuk", "Yaprak", "Bıçak", "Ekmek Arası"] },
+      { target: "KÜNEFE", category: "Yiyecek & Mutfak", forbidden: ["Hatay", "Peynir", "Kadayıf", "Şerbet", "Sıcak"] },
+      { target: "KUMPİR", category: "Yiyecek & Mutfak", forbidden: ["Patates", "Ortaköy", "Meze", "Tereyağı", "Kaşar"] },
+      { target: "ARDA GÜLER", category: "Spor & Futbol", forbidden: ["Real Madrid", "Fenerbahçe", "Milli Takım", "Futbolcu", "Sol Ayak"] },
+      { target: "TARKAN", category: "Müzik & Pop", forbidden: ["Megastar", "Kuzu Kuzu", "Şımarık", "Şarkıcı", "Pop"] },
+      { target: "LAHMACUN", category: "Yiyecek", forbidden: ["Maydanoz", "Limon", "Gevrek", "Kıyma", "Fırın"] },
+      { target: "KOLONYA", category: "Gelenek & Hijyen", forbidden: ["Limon", "Misafir", "Bayram", "Ferahlık", "Alköl"] },
+      { target: "OKEY", category: "Oyun & Eğlence", forbidden: ["Istaka", "Taş", "101", "Çifte", "Okey Atmak"] },
+      { target: "DOLMUŞ", category: "Ulaşım", forbidden: ["Sarı", "Bozuk Para", "Uzatır mısınız", "Şoför", "Minibüs"] },
+      { target: "METROBÜS", category: "Ulaşım & İstanbul", forbidden: ["Kalabalık", "Zincirlikuyu", "Şerit", "Akbil", "Söğütlüçeşme"] },
+      { target: "SOSYAL MEDYA", category: "Teknoloji", forbidden: ["Instagram", "Takipçi", "Beğeni", "Paylaşım", "Hikaye"] },
+      { target: "YAPAY ZEKA", category: "Teknoloji", forbidden: ["Robot", "Chatbot", "Model", "Gelecek", "Akıllı"] }
+    ];
+
+    /* ==========================================================================
+       2. TABU XL SPECIAL TILES & CONFIGURATION
+       ========================================================================== */
+    const TOTAL_BOARD_TILES = 36; // 0 (Start) to 36 (Finish Star)
+
+    // Tile Special Types map
+    const SPECIAL_TILES = {
+      4: { type: 'EXTRA_TIME', name: '+15 Sn Ekstra Süre', color: '#10b981', icon: 'clock' },
+      9: { type: 'DOUBLE_POINTS', name: '2x Çift Puan!', color: '#f59e0b', icon: 'zap' },
+      14: { type: 'EXTRA_PAS', name: '+1 Ekstra Pas Hakkı', color: '#a855f7', icon: 'skip-forward' },
+      19: { type: 'EASY_TABOO', name: '-1 Yasaklı Kelime (Kolay)', color: '#f43f5e', icon: 'shield' },
+      24: { type: 'EXTRA_TIME', name: '+15 Sn Ekstra Süre', color: '#10b981', icon: 'clock' },
+      29: { type: 'DOUBLE_POINTS', name: '2x Çift Puan!', color: '#f59e0b', icon: 'zap' },
+      33: { type: 'EXTRA_PAS', name: '+1 Ekstra Pas Hakkı', color: '#a855f7', icon: 'skip-forward' }
+    };
+
+    const TEAM_COLORS = [
+      { id: 0, name: "Kırmızı Takım", bg: "bg-red-500", text: "text-red-400", hex: "#ef4444", border: "border-red-500" },
+      { id: 1, name: "Mavi Takım", bg: "bg-cyan-500", text: "text-cyan-400", hex: "#06b6d4", border: "border-cyan-500" },
+      { id: 2, name: "Yeşil Takım", bg: "bg-emerald-500", text: "text-emerald-400", hex: "#10b981", border: "border-emerald-500" },
+      { id: 3, name: "Sarı Takım", bg: "bg-amber-400", text: "text-amber-400", hex: "#f59e0b", border: "border-amber-400" }
+    ];
+
+    let gameConfig = {
+      teamsCount: 4,
+      teamNames: ["Kırmızı Takım", "Mavi Takım", "Yeşil Takım", "Sarı Takım"],
+      baseTimerDuration: 60,
+      tabuPenalty: true
+    };
+
+    let gameState = {
+      teamPositions: [0, 0, 0, 0], // Index 0 to 3
+      currentTeamIdx: 0,
+      timeLeft: 60,
+      timerId: null,
+      isRoundActive: false,
+      pasCount: 3,
+      currentCard: null,
+      usedCardIndexes: new Set()
+    };
+
+    let audioEnabled = true;
+
+    /* ==========================================================================
+       3. WEB AUDIO SYNTHESIZER
+       ========================================================================== */
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSound(type) {
+      if (!audioEnabled) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        const now = audioCtx.currentTime;
+
+        if (type === 'correct') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(523.25, now);
+          osc.frequency.setValueAtTime(659.25, now + 0.1);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'tabu') {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.linearRampToValueAtTime(70, now + 0.3);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'pas') {
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(400, now);
+          osc.frequency.setValueAtTime(300, now + 0.08);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } else if (type === 'tick') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(850, now);
+          gain.gain.setValueAtTime(0.04, now);
+          gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.04);
+        } else if (type === 'bonus') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.setValueAtTime(880, now + 0.12);
+          gain.gain.setValueAtTime(0.3, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'timeout') {
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.setValueAtTime(130, now + 0.2);
+          gain.gain.setValueAtTime(0.4, now);
+          gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+          osc.start(now);
+          osc.stop(now + 0.5);
+        }
+      } catch (e) {
+        console.log("Audio error", e);
+      }
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const icon = document.getElementById('audio-icon');
+      if (audioEnabled) {
+        icon.setAttribute('data-lucide', 'volume-2');
+        icon.classList.remove('text-red-400');
+        icon.classList.add('text-emerald-400');
+      } else {
+        icon.setAttribute('data-lucide', 'volume-x');
+        icon.classList.remove('text-emerald-400');
+        icon.classList.add('text-red-400');
+      }
+      lucide.createIcons();
+    }
+
+    /* ==========================================================================
+       4. CURVED SPIRAL BOARD GENERATOR (TABU XL SVG)
+       ========================================================================== */
+    let tileCoordinates = [];
+
+    function generateSpiralTileCoordinates() {
+      tileCoordinates = [];
+      const centerX = 300;
+      const centerY = 300;
+      const maxRadius = 260;
+      const minRadius = 60;
+      const totalRotations = 2.2;
+
+      for (let i = 0; i <= TOTAL_BOARD_TILES; i++) {
+        const progress = i / TOTAL_BOARD_TILES;
+        const angle = progress * (totalRotations * 2 * Math.PI) - (Math.PI / 2);
+        const radius = maxRadius - progress * (maxRadius - minRadius);
+
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        tileCoordinates.push({ x, y, angle });
+      }
+    }
+
+    function renderSpiralBoardSVG() {
+      generateSpiralTileCoordinates();
+      const svg = document.getElementById('tabu-spiral-svg');
+      svg.innerHTML = '';
+
+      // Draw background smooth spiral path
+      let d = `M ${tileCoordinates[0].x} ${tileCoordinates[0].y}`;
+      for (let i = 1; i < tileCoordinates.length; i++) {
+        d += ` L ${tileCoordinates[i].x} ${tileCoordinates[i].y}`;
+      }
+
+      const bgPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      bgPath.setAttribute("d", d);
+      bgPath.setAttribute("fill", "none");
+      bgPath.setAttribute("stroke", "#1e293b");
+      bgPath.setAttribute("stroke-width", "36");
+      bgPath.setAttribute("stroke-linecap", "round");
+      svg.appendChild(bgPath);
+
+      // Draw individual Tiles along spiral
+      tileCoordinates.forEach((coord, i) => {
+        if (i === TOTAL_BOARD_TILES) return; // Finish Star covered by overlay
+
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+        
+        let tileColor = (i % 2 === 0) ? "#3b82f6" : "#ec4899"; // Alternating standard colors
+        let tileLabel = i.toString();
+        let isSpecial = false;
+
+        if (SPECIAL_TILES[i]) {
+          tileColor = SPECIAL_TILES[i].color;
+          isSpecial = true;
+        }
+
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", coord.x);
+        circle.setAttribute("cy", coord.y);
+        circle.setAttribute("r", isSpecial ? "18" : "15");
+        circle.setAttribute("fill", tileColor);
+        circle.setAttribute("stroke", isSpecial ? "#ffffff" : "#0f172a");
+        circle.setAttribute("stroke-width", isSpecial ? "3" : "2");
+        circle.setAttribute("class", "board-tile-path");
+        group.appendChild(circle);
+
+        // Tile Number / Symbol Text
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", coord.x);
+        text.setAttribute("y", coord.y + 4);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("fill", "#ffffff");
+        text.setAttribute("font-size", isSpecial ? "11" : "10");
+        text.setAttribute("font-weight", "900");
+        text.textContent = isSpecial ? (SPECIAL_TILES[i].type === 'EXTRA_TIME' ? '+15' : SPECIAL_TILES[i].type === 'DOUBLE_POINTS' ? '2x' : '★') : tileLabel;
+        group.appendChild(text);
+
+        svg.appendChild(group);
+      });
+
+      // Render Team Pawns on SVG
+      for (let t = 0; t < gameConfig.teamsCount; t++) {
+        const pos = gameState.teamPositions[t];
+        const coord = tileCoordinates[Math.min(pos, TOTAL_BOARD_TILES)];
+        
+        // Offset multiple pawns slightly so they don't overlap completely
+        const offsetX = (t % 2 === 0 ? -6 : 6);
+        const offsetY = (t < 2 ? -6 : 6);
+
+        const pawn = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        pawn.setAttribute("id", `pawn-team-${t}`);
+        pawn.setAttribute("cx", coord.x + offsetX);
+        pawn.setAttribute("cy", coord.y + offsetY);
+        pawn.setAttribute("r", "9");
+        pawn.setAttribute("fill", TEAM_COLORS[t].hex);
+        pawn.setAttribute("stroke", "#ffffff");
+        pawn.setAttribute("stroke-width", "2.5");
+        pawn.setAttribute("class", "pawn-anim shadow-lg");
+        svg.appendChild(pawn);
+      }
+    }
+
+    /* ==========================================================================
+       5. GAMEPLAY LOGIC & CARD MANAGEMENT
+       ========================================================================== */
+    function pickNextCard() {
+      if (gameState.usedCardIndexes.size >= TABOO_CARDS.length) {
+        gameState.usedCardIndexes.clear();
+      }
+
+      let randIdx;
+      do {
+        randIdx = Math.floor(Math.random() * TABOO_CARDS.length);
+      } while (gameState.usedCardIndexes.has(randIdx));
+
+      gameState.usedCardIndexes.add(randIdx);
+      gameState.currentCard = TABOO_CARDS[randIdx];
+
+      displayCard(gameState.currentCard);
+    }
+
+    function displayCard(card) {
+      document.getElementById('target-word').innerText = card.target;
+      document.getElementById('card-category').innerText = card.category;
+
+      const currentTile = gameState.teamPositions[gameState.currentTeamIdx];
+      const isEasyTaboo = SPECIAL_TILES[currentTile] && SPECIAL_TILES[currentTile].type === 'EASY_TABOO';
+
+      const list = document.getElementById('forbidden-words-list');
+      list.innerHTML = '';
+      
+      // If Easy Taboo tile active, show only first 3 forbidden words
+      const wordsToShow = isEasyTaboo ? card.forbidden.slice(0, 3) : card.forbidden;
+
+      wordsToShow.forEach((word, idx) => {
+        const li = document.createElement('li');
+        li.className = `py-1 ${idx < wordsToShow.length - 1 ? 'border-b border-slate-800/80' : ''}`;
+        li.innerText = word;
+        list.appendChild(li);
+      });
+    }
+
+    function startTurn() {
+      gameState.isRoundActive = true;
+      const currentTile = gameState.teamPositions[gameState.currentTeamIdx];
+      
+      // Calculate Timer Duration (Check if on +15s Extra Time Tile)
+      let duration = gameConfig.baseTimerDuration;
+      if (SPECIAL_TILES[currentTile] && SPECIAL_TILES[currentTile].type === 'EXTRA_TIME') {
+        duration += 15;
+        playSound('bonus');
+      }
+      gameState.timeLeft = duration;
+
+      // Calculate Pas Count (Check if on +1 Extra Pas Tile)
+      let pas = 3;
+      if (SPECIAL_TILES[currentTile] && SPECIAL_TILES[currentTile].type === 'EXTRA_PAS') {
+        pas += 1;
+      }
+      gameState.pasCount = pas;
+
+      document.getElementById('pas-count-display').innerText = gameState.pasCount;
+      document.getElementById('start-turn-btn').classList.add('hidden');
+      document.getElementById('active-controls').classList.remove('hidden');
+
+      pickNextCard();
+      updateUI();
+
+      // Countdown Timer Loop
+      clearInterval(gameState.timerId);
+      gameState.timerId = setInterval(() => {
+        gameState.timeLeft--;
+        document.getElementById('timer-display').innerText = gameState.timeLeft;
+
+        if (gameState.timeLeft <= 10 && gameState.timeLeft > 0) {
+          playSound('tick');
+          document.getElementById('timer-box').classList.add('border-red-500', 'animate-pulse');
+        }
+
+        if (gameState.timeLeft <= 0) {
+          endTurnByTime();
+        }
+      }, 1000);
+    }
+
+    function handleAction(type) {
+      if (!gameState.isRoundActive) return;
+
+      const currentTile = gameState.teamPositions[gameState.currentTeamIdx];
+      const isDoublePoints = SPECIAL_TILES[currentTile] && SPECIAL_TILES[currentTile].type === 'DOUBLE_POINTS';
+
+      if (type === 'dogru') {
+        playSound('correct');
+        const increment = isDoublePoints ? 2 : 1;
+        gameState.teamPositions[gameState.currentTeamIdx] = Math.min(TOTAL_BOARD_TILES, gameState.teamPositions[gameState.currentTeamIdx] + increment);
+
+        checkWin();
+        pickNextCard();
+      } else if (type === 'tabu') {
+        playSound('tabu');
+        if (gameConfig.tabuPenalty) {
+          gameState.teamPositions[gameState.currentTeamIdx] = Math.max(0, gameState.teamPositions[gameState.currentTeamIdx] - 1);
+        }
+        pickNextCard();
+      } else if (type === 'pas') {
+        if (gameState.pasCount > 0) {
+          playSound('pas');
+          gameState.pasCount--;
+          document.getElementById('pas-count-display').innerText = gameState.pasCount;
+          if (gameState.pasCount === 0) {
+            document.getElementById('pas-btn').disabled = true;
+            document.getElementById('pas-btn').classList.add('opacity-40', 'cursor-not-allowed');
+          }
+          pickNextCard();
+        }
+      }
+
+      updateUI();
+      renderSpiralBoardSVG();
+    }
+
+    function endTurnByTime() {
+      clearInterval(gameState.timerId);
+      playSound('timeout');
+      gameState.isRoundActive = false;
+
+      document.getElementById('timer-box').classList.remove('border-red-500', 'animate-pulse');
+      document.getElementById('start-turn-btn').classList.remove('hidden');
+      document.getElementById('active-controls').classList.add('hidden');
+      document.getElementById('pas-btn').disabled = false;
+      document.getElementById('pas-btn').classList.remove('opacity-40', 'cursor-not-allowed');
+
+      // Move to next team
+      gameState.currentTeamIdx = (gameState.currentTeamIdx + 1) % gameConfig.teamsCount;
+      
+      openTurnModal();
+      updateUI();
+    }
+
+    function checkWin() {
+      const pos = gameState.teamPositions[gameState.currentTeamIdx];
+      const teamName = gameConfig.teamNames[gameState.currentTeamIdx];
+
+      if (pos >= TOTAL_BOARD_TILES) {
+        clearInterval(gameState.timerId);
+        gameState.isRoundActive = false;
+        alert(`🎉 TEBRİKLER! ${teamName} TABU XL KIVRIMLI TAHTASINI TAMAMLAYIP ŞAMPİYON OLDU! 🎉`);
+        location.reload();
+      }
+    }
+
+    /* ==========================================================================
+       6. UI RENDERING & MODALS
+       ========================================================================== */
+    function updateUI() {
+      // Scoreboard Header Render
+      const container = document.getElementById('teams-scoreboard-box');
+      container.innerHTML = '';
+
+      for (let t = 0; t < gameConfig.teamsCount; t++) {
+        const isCurrent = t === gameState.currentTeamIdx;
+        const color = TEAM_COLORS[t];
+        const pos = gameState.teamPositions[t];
+
+        const badge = document.createElement('div');
+        badge.className = `flex items-center gap-2 px-3 py-1.5 rounded-2xl border transition ${
+          isCurrent 
+            ? `${color.bg} text-white font-extrabold border-white shadow-lg scale-105` 
+            : 'bg-slate-950/70 border-slate-800 opacity-70 text-slate-300'
+        }`;
+        badge.innerHTML = `
+          <span class="w-3 h-3 rounded-full bg-white/80"></span>
+          <span class="text-xs font-bold whitespace-nowrap">${gameConfig.teamNames[t]}</span>
+          <span class="text-xs font-black bg-black/30 px-2 py-0.5 rounded-full">${pos}. Kare</span>
+        `;
+        container.appendChild(badge);
+      }
+
+      // Current Turn Banner Header
+      const activeTeamColor = TEAM_COLORS[gameState.currentTeamIdx];
+      document.getElementById('turn-team-name').innerText = gameConfig.teamNames[gameState.currentTeamIdx];
+      document.getElementById('turn-team-name').className = `font-extrabold text-sm ${activeTeamColor.text}`;
+      document.getElementById('turn-team-badge').className = `w-4 h-4 rounded-full ${activeTeamColor.bg} ring-2 ring-white animate-pulse`;
+      document.getElementById('turn-team-tile').innerText = `Kare: ${gameState.teamPositions[gameState.currentTeamIdx]}`;
+
+      // Special Tile Active Bonus Banner Check
+      const curTile = gameState.teamPositions[gameState.currentTeamIdx];
+      const banner = document.getElementById('tile-bonus-banner');
+      
+      if (SPECIAL_TILES[curTile]) {
+        const spec = SPECIAL_TILES[curTile];
+        document.getElementById('bonus-banner-text').innerText = `ÖZEL KARE: ${spec.name.toUpperCase()}`;
+        document.getElementById('bonus-banner-icon').setAttribute('data-lucide', spec.icon);
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+
+      document.getElementById('timer-display').innerText = gameState.timeLeft;
+      lucide.createIcons();
+    }
+
+    function openTurnModal() {
+      const modal = document.getElementById('turn-modal');
+      const curColor = TEAM_COLORS[gameState.currentTeamIdx];
+      const teamName = gameConfig.teamNames[gameState.currentTeamIdx];
+      const curTile = gameState.teamPositions[gameState.currentTeamIdx];
+
+      document.getElementById('modal-team-icon-box').className = `w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-xl ring-4 ring-white/20 ${curColor.bg}`;
+      document.getElementById('modal-next-team').innerText = `${teamName} Oynuyor!`;
+
+      const tileInfoBox = document.getElementById('modal-tile-info');
+      if (SPECIAL_TILES[curTile]) {
+        document.getElementById('modal-tile-text').innerText = `Bulunduğunuz Kare Bonusu: ${SPECIAL_TILES[curTile].name}!`;
+        tileInfoBox.classList.remove('hidden');
+      } else {
+        tileInfoBox.classList.add('hidden');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeTurnModal() {
+      document.getElementById('turn-modal').classList.add('hidden');
+    }
+
+    function openSettingsModal() {
+      renderTeamInputs();
+      document.getElementById('select-teams-count').value = gameConfig.teamsCount;
+      document.getElementById('select-timer').value = gameConfig.baseTimerDuration;
+      document.getElementById('check-tabu-penalty').checked = gameConfig.tabuPenalty;
+
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+    }
+
+    function renderTeamInputs() {
+      const count = parseInt(document.getElementById('select-teams-count').value || gameConfig.teamsCount);
+      const container = document.getElementById('team-inputs-container');
+      container.innerHTML = '';
+
+      for (let i = 0; i < count; i++) {
+        const div = document.createElement('div');
+        div.innerHTML = `
+          <label class="block font-bold text-xs ${TEAM_COLORS[i].text} mb-1">${i + 1}. Takım İsmi</label>
+          <input type="text" id="input-team-name-${i}" value="${gameConfig.teamNames[i] || TEAM_COLORS[i].name}" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white font-semibold focus:outline-none focus:border-amber-500 text-sm">
+        `;
+        container.appendChild(div);
+      }
+    }
+
+    function saveSettings() {
+      const count = parseInt(document.getElementById('select-teams-count').value);
+      gameConfig.teamsCount = count;
+
+      for (let i = 0; i < count; i++) {
+        const val = document.getElementById(`input-team-name-${i}`).value;
+        gameConfig.teamNames[i] = val || TEAM_COLORS[i].name;
+      }
+
+      gameConfig.baseTimerDuration = parseInt(document.getElementById('select-timer').value);
+      gameConfig.tabuPenalty = document.getElementById('check-tabu-penalty').checked;
+
+      // Reset positions & team state
+      gameState.teamPositions = [0, 0, 0, 0];
+      gameState.currentTeamIdx = 0;
+      gameState.timeLeft = gameConfig.baseTimerDuration;
+
+      closeSettingsModal();
+      updateUI();
+      renderSpiralBoardSVG();
+    }
+
+    /* ==========================================================================
+       7. INITIALIZATION
+       ========================================================================== */
+    window.onload = function() {
+      renderSpiralBoardSVG();
+      pickNextCard();
+      updateUI();
+      lucide.createIcons();
+    };
+  </script>
+</body>
+</html>
